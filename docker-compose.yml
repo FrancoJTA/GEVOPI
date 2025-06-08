@@ -1,0 +1,164 @@
+services:
+  gevopinosql:
+    image: mongo:6.0
+    container_name: mongo_gevopi
+    ports:
+      - "27018:27017"
+    command: ["--bind_ip_all"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: GEVOPI
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    restart: unless-stopped
+    networks:
+      - gevopi-network 
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: GEVOPI
+    ports:
+      - "1433:1433"
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=FJta.010123
+      - MSSQL_PID=Developer
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    restart: unless-stopped
+    networks:
+      - gevopi-network 
+    deploy:
+      resources:
+        limits:
+          memory: 2.5G
+          cpus: '1.0'
+
+  db-setup:
+    image: mcr.microsoft.com/mssql-tools
+    container_name: DB_Setup
+    depends_on:
+      sqlserver:
+        condition: service_started
+    environment:
+      - SA_PASSWORD=FJta.010123
+    volumes:
+      - ./database:/database
+    command: >
+      bash -c "
+      echo 'Waiting for SQL Server to accept connections (max 5 minutes)...';
+      timeout 300 bash -c '
+        until /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SA_PASSWORD\" -Q \"SELECT 1\" &> /dev/null; do
+          echo \"Retrying connection... ($$SECONDS seconds elapsed)\";
+          sleep 5;
+        done
+      ' && (
+        echo 'SQL Server is ready! Creating GEVOPI database...';
+        /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SA_PASSWORD\" -Q \"CREATE DATABASE GEVOPI\";
+        echo 'Executing initialization scripts...';
+        /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SA_PASSWORD\" -d GEVOPI -i /database/init.sql;
+        echo 'Database setup completed successfully';
+      ) || (
+        echo 'ERROR: Failed to connect to SQL Server after 5 minutes';
+        exit 1
+      )
+      "
+    networks:
+      - gevopi-network
+
+
+
+  python-api:
+    build: 
+      context: ./SimulacionAPI
+      dockerfile: Dockerfile  
+    container_name: Python_Api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=1
+    networks:
+      - gevopi-network
+  ia-python-api:
+    build: 
+      context: ./T1
+      dockerfile: Dockerfile  
+    container_name: IA_API
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=1
+    networks:
+      - gevopi-network
+
+
+
+  gevopi-backend:
+    container_name: Spring_Backend
+    build:
+      context: ./Back-End-Gevopi
+      dockerfile: Dockerfile
+    image: gevopi_back_image
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - gevopi-network
+    depends_on:
+      db-setup:
+        condition: service_completed_successfully
+
+
+  backend-nosql-gevopi:
+    container_name: NoSqlGevopi
+    build:
+      context: ./NoSQL_GEVOPI
+      dockerfile: Dockerfile
+    image: gevopinosql_back_image
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    networks:
+      - gevopi-network
+    depends_on:
+      gevopinosql:
+        condition: service_started
+
+
+
+  Global-Api:
+    container_name: Spring_global
+    build:
+      context: ./Api_Global_Alas_Chiquitanas
+      dockerfile: Dockerfile
+    image: alas_chiquitanas_user
+    restart: unless-stopped
+    ports:
+      - "2020:2020"
+    networks:
+      - gevopi-network
+      - global-network
+
+
+
+networks:
+  gevopi-network:
+    driver: bridge
+  global-network:
+    external: true
+
+volumes:
+  sqlserver-data:
+  mongo_data:

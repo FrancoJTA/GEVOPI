@@ -1,0 +1,21 @@
+[submodule "Back-End-Gevopi"]
+	path = Back-End-Gevopi
+	url = https://github.com/FrancoJTA/Back-End-Gevopi.git
+[submodule "Api_Global_Alas_Chiquitanas"]
+	path = Api_Global_Alas_Chiquitanas
+	url = https://github.com/FrancoJTA/Api_Global_Alas_Chiquitanas.git
+[submodule "Train"]
+	path = Train
+	url = https://github.com/FrancoJTA/Train.git
+[submodule "front-prototipo"]
+	path = front-prototipo
+	url = https://github.com/al3jandr05/front-prototipo.git
+[submodule "gevopi-app"]
+	path = gevopi-app
+	url = https://github.com/al3jandr05/gevopi-app.git
+[submodule "NoSQL_GEVOPI"]
+	path = NoSQL_GEVOPI
+	url = https://github.com/MatiasMendoza2005/NoSQL_GEVOPI.git
+[submodule "SimulacionAPI"]
+	path = SimulacionAPI
+	url = https://github.com/MatiasMendoza2005/SimulacionAPI.git
