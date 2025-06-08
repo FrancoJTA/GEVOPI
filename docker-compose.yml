@@ -91,7 +91,7 @@ services:
       - gevopi-network
   ia-python-api:
     build: 
-      context: ./T1
+      context: ./Train
       dockerfile: Dockerfile  
     container_name: IA_API
     restart: unless-stopped
